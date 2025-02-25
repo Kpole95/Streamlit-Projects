@@ -12,7 +12,7 @@ from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
 import joblib
 import io
 import optuna
-from sklearn.model_selection import KFold, cross_val_score  # Fixed typo: model_model -> model_selection
+from sklearn.model_selection import KFold, cross_val_score
 import os
 
 # Models (only import what's used)
@@ -43,10 +43,11 @@ st.write("""
 # Sidebar
 with st.sidebar:
     st.header("⚙️ Settings")
-    file_path = "SeoulBikeData.csv" 
+    file_path = "SeoulBikeData.csv"
+    data_path = os.path.join(os.path.dirname(__file__), file_path)  # Added for sidebar consistency
 
     try:
-        df = pd.read_csv(file_path, encoding="latin1")
+        df = pd.read_csv(data_path, encoding="latin1")  # Use data_path instead of file_path
         st.sidebar.success(f"Loaded: {df.shape[0]} rows, {df.shape[1]} cols")
         logging.info(f"Loaded: {df.shape[0]} rows, {df.shape[1]} cols")
     except Exception as e:
@@ -439,7 +440,7 @@ with tab7:
 with tab8:
     st.subheader("Modeling")
     st.markdown("""
-        **What’s this plan here?**  
+        **What’s the plan here?**  
         This is where we see how good the model is, make some predictions, and save everything for later.
 
         **How do we roll?**  
