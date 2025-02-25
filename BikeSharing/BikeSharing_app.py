@@ -12,8 +12,8 @@ from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
 import joblib
 import io
 import optuna
-from sklearn.model_selection import KFold, cross_val_score
-import os  # Added for os.path
+from sklearn.model_selection import KFold, cross_val_score  # Fixed typo: model_model -> model_selection
+import os
 
 # Models (only import what's used)
 from sklearn.linear_model import LinearRegression
@@ -73,7 +73,7 @@ st.markdown("""
 @st.cache_data
 def load_data(file_path):
     try:
-        data_path = os.path.join(os.path.dirname(__file__), file_path)  # Fixed with os.path
+        data_path = os.path.join(os.path.dirname(__file__), file_path)
         df = pd.read_csv(data_path, encoding="latin1")
         logging.info(f"Loaded: {df.shape[0]} rows, {df.shape[1]} cols")
         st.success(f"Loaded: {df.shape[0]} rows, {df.shape[1]} cols")
@@ -439,7 +439,7 @@ with tab7:
 with tab8:
     st.subheader("Modeling")
     st.markdown("""
-        **What’s the plan here?**  
+        **What’s this plan here?**  
         This is where we see how good the model is, make some predictions, and save everything for later.
 
         **How do we roll?**  
