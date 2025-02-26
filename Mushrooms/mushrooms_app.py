@@ -2,27 +2,22 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 import logging
-from datetime import datetime
 import matplotlib.pyplot as plt
 import seaborn as sns
 import plotly.express as px
 from sklearn.preprocessing import LabelEncoder
-from sklearn.model_selection import train_test_split
+from sklearn.model_selection import train_test_split, KFold, cross_val_score
 from sklearn.metrics import accuracy_score, classification_report
 import joblib
 import io
 import optuna
-from sklearn.model_selection import KFold, cross_val_score
 import os
-
-# Models (only import what's used)
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.svm import SVC
 import xgboost as xgb
 
 # Logging setup
-logging.basicConfig(level=logging.INFO, 
-                    format='%(asctime)s - %(levelname)s - %(message)s')
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logging.info("App initialized")
 
 # UI setup
@@ -31,19 +26,16 @@ st.title("🍄 Mushroom Edibility Predictor")
 st.markdown("""
     <div style='text-align:center; padding:10px; background:#ecf0f1; border-radius:8px;'>
         <h3 style='color:#2c3e50;'>Classify Mushrooms</h3>
-        <p style='color:#7f8c8d;'>Analize, model, and predict edibility.</p>
+        <p style='color:#7f8c8d;'>Analyze, model, and predict edibility.</p>
     </div>
 """, unsafe_allow_html=True)
-st.write("""
-    Hey there! This app’s all about figuring out if mushrooms are safe to eat or not. We got data on stuff like cap shape and smell, and we’ll mess around with charts, tweak some models, and let ya predict yerself. I’ll walk ya thru it so it makes sence—lets dive in!
-""")
+st.write("Hey there! This app digs into the wild world of mushrooms—figuring out if they’re edible or poisonous based on features like cap shape, odor, and more. We’ll explore the data with cool charts, tweak some models, and let you predict edibility yourself. I’ll explain each step so it’s crystal clear—let’s jump in!")
 
 # Sidebar
 with st.sidebar:
     st.header("⚙️ Settings")
     file_path = "mushrooms.csv"
     data_path = os.path.join(os.path.dirname(__file__), file_path)
-
     try:
         df = pd.read_csv(data_path)
         st.sidebar.success(f"Loaded: {df.shape[0]} rows, {df.shape[1]} cols")
@@ -51,21 +43,23 @@ with st.sidebar:
     except Exception as e:
         st.sidebar.error(f"Error: {str(e)}")
         logging.error(f"Load failed: {str(e)}")
+    st.subheader("📖 Guide")
+    st.write("1. Load the data\n2. Explore the tabs\n3. Train the model\n4. Predict and save")
 
 # Data loading and preprocessing
-st.write("### Getting the mushroom data ready")
+st.write("### Getting the Mushroom Data Ready")
 st.markdown("""
-    **Whats this about?**  
-    Were grabbin the mushroom data from a file—like openin a book bout em. Then we fix it up fer analysis.
+    **What’s going on here?**  
+    We’re grabbing mushroom data from a CSV file—like opening a field guide. Then we prep it for analysis.
 
-    **How we doin it?**  
-    - Using pandas to load that csv into the app.
-    - Mushrooms got words like ‘fishy’ fer smell—we turn em into numbers with labelencoder.
-    - If somethin messes up, we’l tell ya with a error.
+    **How do we pull it off?**  
+    - We use `pandas` to load the CSV into the app.
+    - Since mushroom features are text (like 'bell' for cap shape), we turn them into numbers with `LabelEncoder`.
+    - If anything goes wrong, we’ll flag it with an error message.
 
-    **Why bother tho?**  
-    - Raw datas a mess—words not numbers, maybe missin stuff. Cleanin it up let’s us play with it and model it
-    - Plus nobody wants to wait fer a slow load!
+    **Why bother?**  
+    - Raw data’s messy—text instead of numbers, potential missing bits. Cleaning it up lets us explore and model it.
+    - Plus, fast loading keeps things smooth!
 """)
 
 @st.cache_data
@@ -80,23 +74,21 @@ def load_data(file_path):
         st.error(f"Error: {str(e)}")
         return None
     
-    # Encode categorical features
-    st.write("#### Turnin Mushroom Traits Into Numbers")
+    st.write("#### Turning Mushroom Traits into Numbers")
     st.markdown("""
-        **Whats this bout?**  
-        Mushroom stuffs words—like ‘fishy’ smell or ‘brown’ color. We gotta make em numbers fer models.
+        **What’s this about?**  
+        Mushroom data has words—like 'fishy' for odor or 'brown' for color. We need numbers for models.
 
-        **How we doin it?**  
-        - Use labelencoder to swap words fer numbers—like ‘fishy’ gets 1, ‘sweet’ gets 2.
-        - Doin this fer every column since its all words.
+        **How do we do it?**  
+        - We use `LabelEncoder` to swap each unique word for a number (e.g., 'fishy' = 1, 'sweet' = 2).
+        - This happens for every column since they’re all categorical.
 
         **Why’s it worth it?**  
-        - Models don’t get words—they need numbers. This way we can check how cap shape or smell helps predict edibility
+        - Models only crunch numbers, not text. This lets us analyze and predict with traits like cap shape or spore color.
     """)
     le = LabelEncoder()
     for col in df.columns:
         df[col] = le.fit_transform(df[col])
-    
     return df
 
 data = load_data(file_path)
@@ -104,38 +96,38 @@ if data is None:
     st.stop()
 
 # Feature engineering and split
-st.write("### Splittin the mushroom data")
+st.write("### Splitting the Mushroom Data")
 st.markdown("""
-    **Whats this step?**  
-    Were choppin the data into trainin and testin bits to bild and check our model.
+    **What’s this step?**  
+    We’re dividing the data into training and testing sets to build and check our model.
 
-    **How we makin it happen?**  
-    - 80% fer trainin—teachin the model—and 20% fer testin—seein how it does.
-    - Targets ‘class’ (0 fer edible, 1 fer poison), rest is features.
+    **How do we make it happen?**  
+    - We split 80% for training (teaching the model) and 20% for testing (seeing how it does).
+    - The target is 'class' (0 = edible, 1 = poisonous), and features are everything else.
 
-    **Why’s it cool tho?**  
-    - Trainin on most data gives the model a good base, testin on the rest shows how it handels new shrooms
+    **Why’s it cool?**  
+    - Training on most data gives the model a solid foundation, while testing on the rest shows how it handles new mushrooms.
 """)
 X = data.drop("class", axis=1)
 y = data["class"]
 X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
 
 # Model training
-st.write("### Teachin the mushroom model")
+st.write("### Teaching the Mushroom Model")
 st.markdown("""
-    **Whats this all bout?**  
-    Were trainin a model to guess if a shroom’s edible or poison from its bits.
+    **What’s this all about?**  
+    We’re training a model to guess if a mushroom is edible or poisonous based on its features.
 
-    **How we settin it up?**  
-    - Pick a model from a dropdown—like random forest or xgboost
-    - Cache trick keeps it quick fer reruns.
+    **How do we set it up?**  
+    - Pick a model from a dropdown—like Random Forest or XGBoost.
+    - A caching trick keeps it fast for repeated runs.
 
     **Why’s it neat?**  
-    - Differnt models catch differnt things—random forest’s good with messy data, svm might split tricky ones. Pick what ya like!
+    - Different models catch different patterns—Random Forest loves complex data, SVM might nail tricky splits. Pick what works best!
 """)
 st.write("Global Model Settings (affects all tabs):")
 model_choice = st.selectbox("Model", ["Random Forest", "SVM", "XGBoost"], index=0, key="train_model",
-                            help="Chose yer classifier! Random forest’s great fer lotsa features, xgboost ups the accuracy.")
+                            help="Choose your classifier! Random Forest is great for lots of features; XGBoost boosts accuracy.")
 
 @st.cache_resource
 def train_model(choice, X_train, y_train):
@@ -156,105 +148,100 @@ tab0, tab1, tab2, tab3, tab4, tab5 = st.tabs(
     ["Raw Data and EDA", "📊 Distribution", "🌐 Corr", "⏰ Feature Importance", "Optuna Tuning", "Model"]
 )
 
-# Tab 0: Raw Data Display
 with tab0:
     st.subheader("Raw Data")
     st.markdown("""
-        **Whats this tab?**  
-        Yer first peek at the shroom data—like flippin thru a nature book.
+        **What’s this tab?**  
+        Your first look at the mushroom data—like flipping through a nature book.
 
         **How’s it laid out?**  
-        - First 5 rows fer a quick look
-        - Basic stats fer ranges n counts
-        - Bar charts show how features spread
+        - First 5 rows give a quick peek.
+        - Basic stats show ranges and counts.
+        - Bar charts reveal feature spreads.
 
-        **Why check it?**  
-        - See what were dealin with—how many edibles vs poison, common traits. Like scoutin the woods!
+        **Why check it out?**  
+        - See what we’re working with—how many edible vs. poisonous, common traits. It’s like scouting the forest!
     """)
     display_data = data.head()
     st.dataframe(display_data)
-    st.markdown("**Data Summry:**")
+    st.markdown("**Data Summary:**")
     st.write(data.describe())
-    st.markdown("**Feature Distributions (bar charts):**")
+    st.markdown("**Feature Distributions (Bar Charts):**")
     for col in data.columns:
         fig = px.histogram(data, x=col, title=f"{col} Distribution", nbins=len(data[col].unique()))
         st.plotly_chart(fig, use_container_width=True)
 
-# Tab 1: Distribution
 with tab1:
     st.subheader("Class Distribution")
     st.markdown("""
-        **Whats up here?**  
-        Were checkin how many shrooms are edible vs poison.
+        **What’s up here?**  
+        We’re checking how many mushrooms are edible vs. poisonous.
 
-        **How we showin it?**  
-        - Bar chart counts each class
+        **How do we show it?**  
+        - A bar chart plots the counts of each class.
 
         **Why’s it handy?**  
-        - If its lopsided—tons edible, few poison—the model might need a tweak to catch em
+        - If it’s lopsided (lots of edible, few poisonous), the model might need tweaking to handle it.
     """)
     fig = px.histogram(data, x="class", title="Edible vs. Poisonous", labels={"class": "Class (0=Edible, 1=Poisonous)"})
     st.plotly_chart(fig, use_container_width=True)
 
-# Tab 2: Correlations
 with tab2:
-    st.subheader("Feature Corellations")
+    st.subheader("Feature Correlations")
     st.markdown("""
-        **Whats this bout?**  
-        Were seein how shroom traits tie to eachother and edibility
+        **What’s this about?**  
+        We’re seeing how mushroom traits relate to each other and edibility.
 
         **How’s it done?**  
-        - Heatmap shows corellations from -1 (opposite) to 1 (same)
-        - Top 5 links to ‘class’ listed
+        - A heatmap shows correlations from -1 (opposite) to 1 (same).
+        - Top 5 links to 'class' are listed.
 
-        **Why’s it usefull?**  
-        - If odor’s big with edibility, model can use it. Spottin overlaps keeps it simple!
+        **Why’s it useful?**  
+        - If odor strongly ties to edibility, the model can lean on it. Spotting overlaps helps simplify things!
     """)
     corr = data.corr()
     fig, ax = plt.subplots()
     sns.heatmap(corr, annot=True, cmap='viridis', fmt='.2f', ax=ax)
     st.pyplot(fig)
-    st.write("Top 5 Corelaltions with Class:")
+    st.write("Top 5 Correlations with Class:")
     st.write(corr["class"].sort_values(ascending=False)[1:6].to_frame().style.format("{:.2f}"))
 
-# Tab 3: Feature Importance
 with tab3:
-    st.subheader("Feature Imporance")
+    st.subheader("Feature Importance")
     st.markdown("""
-        **Whats this tellin us?**  
-        Which traits—like smell or gill size—matter most fer guessin edibility?
+        **What’s this telling us?**  
+        Which traits—like odor or gill size—matter most for predicting edibility?
 
-        **How we seein it?**  
-        - Fer random forest or xgboost, we get scores fer each trait n plot em in a bar chart
+        **How do we see it?**  
+        - For Random Forest or XGBoost, we get scores for each feature and plot them in a bar chart.
 
         **Why’s it a big deal?**  
-        - Knowin top dogs (like spore color) shows what drives the model’s guesses!
+        - Knowing the top players (e.g., spore print color) helps us understand what drives the model’s guesses!
     """)
     if model_choice in ["Random Forest", "XGBoost"]:
         if hasattr(model, 'feature_importances_'):
             importance = model.feature_importances_
             importance_df = pd.DataFrame({'Feature': X.columns, 'Importance': importance}).sort_values(by='Importance', ascending=False)
-            fig = px.bar(importance_df, x='Importance', y='Feature', orientation='h', title="Feature Imporance")
+            fig = px.bar(importance_df, x='Importance', y='Feature', orientation='h', title="Feature Importance")
             st.plotly_chart(fig, use_container_width=True)
         else:
-            st.warning("Feature imporance not availble fer this model.")
+            st.warning("Feature importance not available for this model.")
 
-# Tab 4: Optuna Hyperparameter Tuning
 with tab4:
-    st.subheader("Optuna Hyperparamter Tuning")
+    st.subheader("Optuna Hyperparameter Tuning")
     st.markdown("""
-        **Whats this fancy stuff?**  
-        Were tweakin the model—like tunin a shroom recipe—fer best results
+        **What’s this fancy stuff?**  
+        We’re tweaking the model—like tuning a mushroom recipe—for top performance.
 
-        **How we tweakn it?**  
-        - Optuna tries 50 combos of settins (like tree depth fer random forest) to cut error
-        - Spits out the best setup
+        **How do we tweak it?**  
+        - Optuna tries 50 combos of settings (e.g., tree depth for Random Forest) to minimize error.
+        - It spits out the best setup.
 
         **Why mess with it?**  
-        - Default’s ok, but tunin can make it way sharper—espeshally fer tricky shrooms!
+        - Default settings are okay, but tuning can boost accuracy—especially for tricky mushrooms!
     """)
     model_choice_optuna = st.selectbox("Model", ["Random Forest", "XGBoost"], index=0, key="optuna_model",
-                                       help="Pick one to tune—random forest n xgboost got lotsa dials to twist!")
+                                       help="Pick one to tune—Random Forest and XGBoost have lots of dials to twist!")
     
     def objective(trial):
         model_name = model_choice_optuna
@@ -268,50 +255,46 @@ with tab4:
             model = xgb.XGBClassifier(learning_rate=learning_rate, max_depth=max_depth, random_state=42)
         else:
             return float('inf')
-        
         model.fit(X_train, y_train)
         y_pred = model.predict(X_test)
-        return 1 - accuracy_score(y_test, y_pred)  # Minimize error (1 - accuracy)
+        return 1 - accuracy_score(y_test, y_pred)
 
-    if st.button("Start Tunin"):
+    if st.button("Start Tuning"):
         study = optuna.create_study(direction="minimize")
         study.optimize(objective, n_trials=50)
-        st.write("Best Paramters:", study.best_params)
-        st.write("Best Accurasy:", 1 - study.best_value)
-        st.write("Heads up: this tunes a fresh model—put these settins up top to use em everywhere!")
+        st.write("Best Parameters:", study.best_params)
+        st.write("Best Accuracy:", 1 - study.best_value)
+        st.write("Heads up: This tunes a fresh model—apply these settings up top to use them everywhere!")
 
-# Tab 5: Modeling
 with tab5:
-    st.subheader("Modelin")
+    st.subheader("Modeling")
     st.markdown("""
-        **Whats the plan here?**  
-        Were seein how good the model spots edible vs poison shrooms n lettin ya test it
+        **What’s the plan here?**  
+        We’re seeing how well the model identifies edible vs. poisonous mushrooms and letting you test it.
 
-        **How we rollin?**  
-        - **Metrics**: Accurasy (how often its right) n a detaild report (precison, recall)
-        - **Predictin**: Pick traits n guess edibility
-        - **Save/Export**: Keep the model or grab a csv of guesses
+        **How do we roll?**  
+        - **Metrics**: Accuracy (how often it’s right) and a detailed report (precision, recall).
+        - **Prediction**: Pick traits and guess edibility.
+        - **Save/Export**: Save the model or download predictions.
 
         **Why’s this fun?**  
-        - Metrics tell if its trustable. Predictin’s like playin shroom detective!
+        - Metrics show if it’s trustworthy. Predicting feels like playing mushroom detective!
     """)
     accuracy = accuracy_score(y_test, y_pred)
     report = classification_report(y_test, y_pred, target_names=["Edible", "Poisonous"])
-    st.metric("Accurasy", f"{accuracy:.2f}", help="How often the model guesses right.")
-    st.text("Classifcation Report:")
+    st.metric("Accuracy", f"{accuracy:.2f}", help="How often the model guesses right.")
+    st.text("Classification Report:")
     st.text(report)
 
-    st.write("#### Predictin Form")
-    st.markdown("""
-        Try it out! Pick some shroom traits n see if its safe to eat
-    """)
+    st.write("#### Prediction Form")
+    st.markdown("Try it out! Pick some mushroom traits and see if it’s safe to eat.")
     with st.form("predict"):
         col1, col2 = st.columns(2)
         with col1:
-            cap_shape = st.selectbox("Cap Shape", data['cap-shape'].unique(), help="Shape of cap—like ‘bell’ or ‘flat’.")
-            odor = st.selectbox("Odor", data['odor'].unique(), help="Smell—like ‘almond’ or ‘foul’.")
+            cap_shape = st.selectbox("Cap Shape", data['cap-shape'].unique(), help="Shape of the cap—like 'bell' or 'flat'.")
+            odor = st.selectbox("Odor", data['odor'].unique(), help="Smell—like 'almond' or 'foul'.")
         with col2:
-            gill_color = st.selectbox("Gill Color", data['gill-color'].unique(), help="Color under cap.")
+            gill_color = st.selectbox("Gill Color", data['gill-color'].unique(), help="Color under the cap.")
             spore_print = st.selectbox("Spore Print Color", data['spore-print-color'].unique(), help="Color of spore dust.")
         
         submit = st.form_submit_button("Predict")
@@ -326,17 +309,12 @@ with tab5:
         st.success(f"Predicted Edibility: **{result}**")
 
     st.write("#### Save Model")
-    st.markdown("Save yer model fer later—like preservin a shroom recipe!")
+    st.markdown("Save your model for later—like preserving a mushroom recipe!")
     if st.button("Save Model"):
         joblib.dump(model, "mushroom_model.pkl")
         st.success("Model saved")
 
-    st.write("#### Export Predictins")
-    st.markdown("Download what we guessed vs reality—great fer checkin our work")
+    st.write("#### Export Predictions")
+    st.markdown("Download what we guessed vs. reality—perfect for checking our work.")
     csv = pd.DataFrame({"Actual": y_test, "Predicted": y_pred}).to_csv(index=False)
-    st.download_button("Download Predictins", csv, "mushroom_predictions.csv", "text/csv")
-
-# Sidebar docs
-with st.sidebar:
-    st.subheader("📖 Guide")
-    st.write("1. Load the data\n2. Check the tabs\n3. Train the model\n4. Predict n save")
+    st.download_button("Download Predictions", csv, "mushroom_predictions.csv", "text/csv")
