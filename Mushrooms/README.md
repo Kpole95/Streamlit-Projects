@@ -24,7 +24,6 @@ The dataset (`mushrooms.csv`) is a classic mushroom collection—think cap shape
 
 ## How to Run It
 - **Locally**: Fork this folder, run `pip install -r requirements.txt` in a terminal here, then `streamlit run mushrooms_app.py`.
-- **Online**: It’s up on Streamlit Cloud [here](https://app-projects-epbrznvgpqhrvyzbz5yappg.streamlit.app/)—swap in the real link when it’s live.
-
+- **Online**: It’s up on Streamlit Cloud [here](https://app-projects-epbrznvgpqhrvyzbz5yappg.streamlit.app/).
 ## Why I Made This
 I stumbled across this mushroom dataset and thought, “Hey, can I teach a model to spot the bad ones?”.
