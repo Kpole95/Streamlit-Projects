@@ -1,4 +1,4 @@
-🍄 # Mushrooms App
+# 🍄 Mushrooms App
 
 This is my Mushrooms app, designed to classify mushrooms as edible or poisonous based on traits like cap shape and odor. It’s a Streamlit app, so it’s fully interactive think data visuals, model tuning, and predictions at your fingertips.
 
