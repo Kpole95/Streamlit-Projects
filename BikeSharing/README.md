@@ -15,7 +15,7 @@ streamlit run BikeSharing_app.py
 It’ll pop open in your browser—easy peasy!
 
 ## Try It Online
-I’ve got it live on Streamlit Cloud too! Check it out [here](https://app-projects-3dxuaexk7h53lyqcjytnx2.streamlit.app/) (replace with the real URL once it’s up). No setup needed—just click and play.
+I’ve got it live on Streamlit Cloud too! Check it out [here](https://app-projects-3dxuaexk7h53lyqcjytnx2.streamlit.app/). No setup needed—just click and play.
 
 ## A Little Background
 I started this to mess around with some data I found it’s from Kaggle. The app’s grown into a fun way to see what drives rentals and test out prediction models. Hope you enjoy poking around as much as I did making it!
